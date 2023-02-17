@@ -11,3 +11,114 @@ As this check uses viper and cobra for commandline, environment and configuratio
 
 Calling check_f5_telemetry without any command verb will output the help page. You need to provide one of the available commands to get soemthing useful done.
 
+### Monitoring pool health
+
+Using the subcommand "pool", you can monitor the pool health based on the telemetry data stored in elasticsearch.
+
+#### Usage
+
+```bash
+  check_f5_telemetry pool [flags]
+
+Flags:
+  -h, --help              help for pool
+  -i, --ignore_disabled   Ignore disabled members
+  -O, --pool string       Name of the pool object to check
+
+Global Flags:
+  -A, --age_critical string   Critical if data is older than this (default "15m")
+  -a, --age_warning string    Warn if data is older than this (default "5m")
+  -c, --config string         Configuration file
+  -C, --critical string       Critical range
+  -H, --host string           Hostname of the server (default "localhost")
+  -I, --index string          Name of the index containing the f5 telemetry data (default "f5_telemetry")
+  -L, --logfile string        Log file (use - to log to stdout) (default "/var/log/icinga2/check_f5_telemetry.log")
+  -l, --loglevel string       Log level (default "WARN")
+  -p, --password string       Password for the Elasticsearch user (consider using the env variable CLE_PASSWORD instead of passing it via commandline)
+  -P, --port int              Network port (default 9200)
+  -y, --proxy string          Proxy (defaults to none)
+  -Y, --socks                 This is a SOCKS proxy
+  -s, --ssl                   Use SSL (default true)
+  -T, --timeout string        Timeout understood by time.ParseDuration (default "2m")
+  -u, --user string           Username for Elasticsearch
+  -v, --validatessl           Validate SSL certificate (default true)
+  -W, --warning string        Warning range
+```
+
+A manual call to show the health of the "kibana" pool would look like this:
+
+```bash
+read -p "Elasticcsearch User: " USER
+read -s -p "Password: " CF5_PASSWORD
+/usr/lib64/nagios/plugins/check_f5_telemetry pool -H "elasticsearch.example.com" -u "$USER" -O "/Common/elasticsearch-pool" -W 1 -C 2 -a 5m -A 15m
+```
+
+### Monitoring throughput
+                           
+Using the subcommand "throughput", you can monitor the pool health based on the telemetry data stored in elasticsearch.
+
+#### Usage
+
+```bash
+  check_f5_telemetry throughput [flags]
+
+Flags:
+  -h, --help   help for throughput
+
+Global Flags:
+  -A, --age_critical string   Critical if data is older than this (default "15m")
+  -a, --age_warning string    Warn if data is older than this (default "5m")
+  -c, --config string         Configuration file
+  -C, --critical string       Critical range
+  -H, --host string           Hostname of the server (default "localhost")
+  -I, --index string          Name of the index containing the f5 telemetry data (default "f5_telemetry")
+  -L, --logfile string        Log file (use - to log to stdout) (default "/var/log/icinga2/check_f5_telemetry.log")
+  -l, --loglevel string       Log level (default "WARN")
+  -p, --password string       Password for the Elasticsearch user (consider using the env variable CLE_PASSWORD instead of passing it via commandline)
+  -P, --port int              Network port (default 9200)
+  -y, --proxy string          Proxy (defaults to none)
+  -Y, --socks                 This is a SOCKS proxy
+  -s, --ssl                   Use SSL (default true)
+  -T, --timeout string        Timeout understood by time.ParseDuration (default "2m")
+  -u, --user string           Username for Elasticsearch
+  -v, --validatessl           Validate SSL certificate (default true)
+  -W, --warning string        Warning range
+```
+
+A manual call to show the health of the "kibana" pool would look like this:
+
+```bash
+read -p "Elasticcsearch User: " USER
+read -s -p "Password: " CF5_PASSWORD
+/usr/lib64/nagios/plugins/monitoring-check_f5_telemetry\check_f5_telemetry>check_f5_telemetry throughput  -H "elasticsearch.example.com" -u "$USER" -W 20.000.000 -C 24.000.000 -a 5m -A 15m
+```
+
+## Installation
+
+There are a whole lot of things to set up before you can use this to monitor the F5 loadbalancer. This is only a very brief overview on how to set up all involved components.
+
+### Configure elasticsearch
+
+Elasticsearch needs a few things in place before we can actually store data in it:
+
+1. Create a user and role granting permissions to write data into the datastream
+2. Create a pipeline which copies the system.systemTimestamp into @timestamp as elasticsearch no longer supports specifying the name for a
+   field.
+3. Create a retention policy
+4. Create component template(s) which define the settings and mappings for the index as well as using the pipeline on every incoming record
+5. Create a composite template with "datastream enabled", tying the component templates together
+
+### Configure the loadbalancer
+
+1. Install the f5_telemetry iApp RPM
+2. Configure the loadbalancer to send the telemetry data to elasticsearch
+
+### Install the check
+
+1. Install the provided RPM or copy the binary to /usr/lib64/nagios/plugins
+
+#### Configure Icinga
+
+1. Create checkcommands for both "pool" and "throughput"
+2. Create service templates
+3. Define checks
