@@ -1,0 +1,4 @@
+*.yaml
+*.ndjson
+check_f5_telemetry/check_f5_telemetry.exe
+check_f5_telemetry/check_f5_telemetry
