@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/joernott/monitoring-check_f5_telemetry/check_f5_telemetry/elasticsearch"
 	"github.com/joernott/nagiosplugin/v2"
 	"github.com/rs/zerolog/log"
@@ -29,37 +29,21 @@ var MetricFields = [...]string{
 // Where we store the metrics in a ThrougputData element
 type MetricData map[string]float64
 
-// Set of statistics
-type ThroughputData struct {
-	Timestamp time.Time  `yaml:"Timestamp" json:"Timestamp"`
-	Fields    MetricData `yaml:"Fields" json:"Fields"`
-}
-
 //The Pool object created and initialized by NewPool consolidates the
 // connection to Elasticsearch, the nagios object pool and index name
 // needed to run the check.
 type Throughput struct {
-	index         string
-	connection    *elasticsearch.Elasticsearch
-	nagios        *nagiosplugin.Check
-	Timestamp time.Time  `yaml:"Timestamp" json:"Timestamp"`
-	Fields    MetricData `yaml:"Fields" json:"Fields"`
-
-	FileName      string
-	old           ThroughputData
-	Current       ThroughputData
-	Delta         ThroughputData
-	Throughput    ThroughputData
-	Duration      time.Duration
-	ThroughputIn  float64
-	ThroughputOut float64
+	index      string
+	connection *elasticsearch.Elasticsearch
+	nagios     *nagiosplugin.Check
+	Timestamp  time.Time  `yaml:"Timestamp" json:"Timestamp"`
+	Fields     MetricData `yaml:"Fields" json:"Fields"`
 }
 
 // Creates a Throughput object containing the connection object to Elasticsearch, a
 // Nagios object, the Index and statisticalData
-func NewThroughput(Index string, FileName string, Connection *elasticsearch.Elasticsearch, Nagios *nagiosplugin.Check) (*Throughput, error) {
+func NewThroughput(Index string, Connection *elasticsearch.Elasticsearch, Nagios *nagiosplugin.Check) (*Throughput, error) {
 	var t *Throughput
-	var err error
 
 	logger := log.With().Str("func", "NewCheck").Str("package", "throughput").Logger()
 	logger.Trace().Msg("Enter func")
@@ -67,15 +51,7 @@ func NewThroughput(Index string, FileName string, Connection *elasticsearch.Elas
 	t.index = Index
 	t.connection = Connection
 	t.nagios = Nagios
-	t.FileName=FileName
-	t.Current.Fields = make(MetricData)
-	t.Delta.Fields = make(MetricData)
-	t.Throughput.Fields = make(MetricData)
-	t.old, err = readHistoricThroughput(t.FileName)
-	if err != nil {
-		t.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("%v. Could not read historic data", err))
-		return nil, err
-	}
+	t.Fields = make(MetricData)
 	return t, nil
 }
 
@@ -102,11 +78,6 @@ func (t *Throughput) Execute() error {
 	if err != nil {
 		return err
 	}
-	t.calculateThroughput()
-	err = saveHistoricThroughput(t.FileName, t.Current)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -116,7 +87,6 @@ func (t *Throughput) gatherThroughputData(e *elasticsearch.ElasticsearchResult) 
 	logger := log.With().Str("func", "gatherPoolState").Str("package", "throughput").Logger()
 	logger.Trace().Msg("Enter func")
 
-	spew.Dump(e)
 	if len(e.Hits.Hits) == 0 {
 		fields = make(elasticsearch.HitElement)
 	} else {
@@ -141,72 +111,33 @@ func (t *Throughput) gatherThroughputData(e *elasticsearch.ElasticsearchResult) 
 			Msg("Could not parse timestamp")
 		return err
 	}
-	t.Current.Timestamp = ts
+	t.Timestamp = ts
 	for _, f := range MetricFields {
 		logger.Trace().Str("id", "DBG20030001").Str("field", f).Msg("Processing field")
 		if fields["system.throughputPerformance."+f+".current"] != nil {
-			t.Current.Fields[f] = fields["system.throughputPerformance."+f+".current"].([]interface{})[0].(float64)
+			t.Fields[f] = fields["system.throughputPerformance."+f+".current"].([]interface{})[0].(float64)
 		} else {
 			logger.Warn().Str("id", "WRN2003001").
 				Str("field", f).
 				Msg("Field is missing")
 		}
 	}
-	_, cbi_ok := t.Current.Fields["clientBitsIn"]
-	if !cbi_ok {
-		logger.Error().Str("id", "ERR2003003").Msg("Critical fields clientBitsIn is missing")
-		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields clientBitsIn is missing")
+	_, bi_ok := t.Fields["inBits"]
+	if !bi_ok {
+		logger.Error().Str("id", "ERR2003003").Msg("Critical fields inBits is missing")
+		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields inBits is missing")
 	}
-	_, cbo_ok := t.Current.Fields["clientBitsOut"]
-	if !cbo_ok {
-		logger.Error().Str("id", "ERR2003004").Msg("Critical fields clientBitsOut is missing")
-		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields clientBitsOut is missing")
+	_, bo_ok := t.Fields["outBits"]
+	if !bo_ok {
+		logger.Error().Str("id", "ERR2003004").Msg("Critical fields outBits is missing")
+		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields outBits is missing")
 	}
-	_, sbi_ok := t.Current.Fields["serverBitsIn"]
-	if !sbi_ok {
-		logger.Error().Str("id", "ERR2003003").Msg("Critical fields ServerBitsIn is missing")
-		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields ServerBitsIn is missing")
-	}
-	_, sbo_ok := t.Current.Fields["serverBitsOut"]
-	if !sbo_ok {
-		logger.Error().Str("id", "ERR2003003").Msg("Critical fields ServerBitsOut is missing")
-		t.nagios.AddResult(nagiosplugin.UNKNOWN, "Critical fields ServerBitsOut is missing")
-	}
-
-	if !(cbi_ok && cbo_ok && sbi_ok && sbo_ok) {
+	if !(bi_ok && bo_ok) {
 		logger.Error().Str("id", "ERR2003003").Msg("One of the critical fields is missing, can't calculate throughput")
-		spew.Dump(t.Current.Fields)
 		return errors.New("One of the critical fields is missing, can't calculate throughput")
 	}
 
 	return nil
-}
-
-// calculate the Throughput
-func (t *Throughput) calculateThroughput() {
-	logger := log.With().Str("func", "calculateThroughput").Str("package", "throughput").Logger()
-	logger.Trace().Msg("Enter func")
-
-	t.Duration = t.Current.Timestamp.Sub(t.old.Timestamp)
-	seconds := t.Duration.Seconds()
-
-	// Calculating the delta between old and new values and througput per field
-	for _, f := range MetricFields {
-		t.Delta.Fields[f] = t.Current.Fields[f] - t.old.Fields[f]
-		if seconds != 0 {
-			t.Throughput.Fields[f] = t.Delta.Fields[f] / seconds
-		} else {
-			t.Throughput.Fields[f] = 0
-		}
-	}
-
-	if seconds != 0 {
-		t.ThroughputIn = (t.Delta.Fields["clientBitsIn"] + t.Delta.Fields["clientBitsOut"]) / seconds
-		t.ThroughputOut = (t.Delta.Fields["serverBitsIn"] + t.Delta.Fields["serverBitsOut"]) / seconds
-	} else {
-		t.ThroughputIn = 0
-		t.ThroughputOut = 0
-	}
 }
 
 // Chech whether we have reached any thesholds
@@ -215,26 +146,26 @@ func (t *Throughput) Check(Warn string, Crit string, AgeWarn string, AgeCrit str
 	logger.Trace().Msg("Enter func")
 
 	ok := true
-	if checkRange(t.nagios, Crit, t.ThroughputIn, "critical") {
-		t.nagios.AddResult(nagiosplugin.CRITICAL, fmt.Sprintf("CRITICAL: Throughput In %v is above critical threshold %v", t.ThroughputIn, Crit))
+	if checkRange(t.nagios, Crit, t.Fields["inBits"], "critical") {
+		t.nagios.AddResult(nagiosplugin.CRITICAL, fmt.Sprintf("CRITICAL: Bits In %v is above critical threshold %v", t.Fields["inBits"], Crit))
 		ok = false
 	}
-	if checkRange(t.nagios, Crit, t.ThroughputOut, "critical") {
-		t.nagios.AddResult(nagiosplugin.CRITICAL, fmt.Sprintf("CRITICAL: Throughput Out %v is above critical threshold %v", t.ThroughputOut, Crit))
+	if checkRange(t.nagios, Crit, t.Fields["outBits"], "critical") {
+		t.nagios.AddResult(nagiosplugin.CRITICAL, fmt.Sprintf("CRITICAL: Bits Out %v is above critical threshold %v", t.Fields["outBits"], Crit))
 		ok = false
 	}
 
-	if checkRange(t.nagios, Warn, t.ThroughputIn, "warning") {
-		t.nagios.AddResult(nagiosplugin.WARNING, fmt.Sprintf("WARNING: Throughput In %v is above warning threshold %v", t.ThroughputIn, Warn))
+	if checkRange(t.nagios, Warn, t.Fields["inBits"], "warning") {
+		t.nagios.AddResult(nagiosplugin.WARNING, fmt.Sprintf("WARNING: Bits In %v is above warning threshold %v", t.Fields["inBits"], Warn))
 		ok = false
 	}
-	if checkRange(t.nagios, Warn, t.ThroughputOut, "warning") {
-		t.nagios.AddResult(nagiosplugin.WARNING, fmt.Sprintf("WARNING: Throughput Out %v is above warning threshold %v", t.ThroughputOut, Warn))
+	if checkRange(t.nagios, Warn, t.Fields["outBits"], "warning") {
+		t.nagios.AddResult(nagiosplugin.WARNING, fmt.Sprintf("WARNING: Bits Out %v is above warning threshold %v", t.Fields["outBits"], Warn))
 		ok = false
 	}
 
 	if ok {
-		t.nagios.AddResult(nagiosplugin.OK, fmt.Sprintf("OK: Throughput In %v and Out %v are within Thtesholds %v/%v", t.ThroughputIn, t.ThroughputOut, Warn, Crit))
+		t.nagios.AddResult(nagiosplugin.OK, fmt.Sprintf("OK: Bits In %v and Out %v are within Thtesholds %v/%v", t.Fields["inBits"], t.Fields["outBits"], Warn, Crit))
 	}
 	t.checkAddPerfdata()
 }
@@ -261,15 +192,7 @@ func checkRange(nagios *nagiosplugin.Check, CheckRange string, Value float64, Al
 // add performance data to the nagios output
 func (t *Throughput) checkAddPerfdata() {
 	for _, f := range MetricFields {
-		p, _ := nagiosplugin.NewFloatPerfDatumValue(t.Throughput.Fields[f])
-		t.nagios.AddPerfDatum("throughput_"+f, "", p, nil, nil, nil, nil)
-		p, _ = nagiosplugin.NewFloatPerfDatumValue(t.Delta.Fields[f])
-		t.nagios.AddPerfDatum("delta_"+f, "", p, nil, nil, nil, nil)
-		p, _ = nagiosplugin.NewFloatPerfDatumValue(t.Current.Fields[f])
-		t.nagios.AddPerfDatum(f, "c", p, nil, nil, nil, nil)
+		p, _ := nagiosplugin.NewFloatPerfDatumValue(t.Fields[f])
+		t.nagios.AddPerfDatum(f, "", p, nil, nil, nil, nil)
 	}
-	p, _ := nagiosplugin.NewFloatPerfDatumValue(t.ThroughputIn)
-	t.nagios.AddPerfDatum("ThroughputIn", "", p, nil, nil, nil, nil)
-	p, _ = nagiosplugin.NewFloatPerfDatumValue(t.ThroughputOut)
-	t.nagios.AddPerfDatum("ThroughputOut", "", p, nil, nil, nil, nil)
 }

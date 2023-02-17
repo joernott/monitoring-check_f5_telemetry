@@ -18,6 +18,7 @@ type Elasticsearch struct {
 type ElasticsearchErrorResponse struct {
 	Error ElasticsearchError `json:"error"`
 }
+
 // Elasticsearch error data returned when Elasticsearch run into an error
 type ElasticsearchError struct {
 	RootCause []ElasticsearchErrorRootCause `json:"root_cause"`

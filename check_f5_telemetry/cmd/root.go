@@ -95,9 +95,6 @@ var AgeCrit string
 // Global variable for cobra, Ignore disabled pool members
 var IgnoreDisabled bool
 
-// Global variable for cobra, file name for historic data
-var FileName string
-
 // Run the checkcommand
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -130,8 +127,6 @@ func init() {
 	poolCmd.PersistentFlags().StringVarP(&Pool, "pool", "O", "", "Name of the pool object to check")
 	poolCmd.PersistentFlags().BoolVarP(&IgnoreDisabled, "ignore_disabled", "i", false, "Ignore disabled members")
 
-	throughputCmd.PersistentFlags().StringVarP(&FileName, "filename", "f", "/var/cache/icinga2/check_f5_telemetry/throughput.yaml", "File to store historic data in")
-
 	rootCmd.AddCommand(poolCmd)
 	rootCmd.AddCommand(throughputCmd)
 
@@ -145,7 +140,7 @@ func init() {
 	viper.SetDefault("password", "")
 	viper.SetDefault("proxy", "")
 	viper.SetDefault("socks", false)
-	viper.SetDefault("timeout", "2m")	
+	viper.SetDefault("timeout", "2m")
 	viper.SetDefault("warning", "")
 	viper.SetDefault("critical", "")
 	viper.SetDefault("age_warning", "5m")
@@ -154,8 +149,6 @@ func init() {
 
 	viper.SetDefault("pool", "")
 	viper.SetDefault("ignore_disabled", "false")
-
-	viper.SetDefault("filename", "/var/cache/icinga2/check_f5_telemetry/throughput.yaml")
 
 	viper.BindPFlag("loglevel", rootCmd.PersistentFlags().Lookup("loglevel"))
 	viper.BindPFlag("logfile", rootCmd.PersistentFlags().Lookup("logfile"))
@@ -176,8 +169,6 @@ func init() {
 
 	viper.BindPFlag("pool", poolCmd.PersistentFlags().Lookup("pool"))
 	viper.BindPFlag("ignore_disabled", poolCmd.PersistentFlags().Lookup("ignore_disabled"))
-
-	viper.BindPFlag("filename", throughputCmd.PersistentFlags().Lookup("filename"))
 
 	viper.SetEnvPrefix("cf5")
 	viper.BindEnv("password")

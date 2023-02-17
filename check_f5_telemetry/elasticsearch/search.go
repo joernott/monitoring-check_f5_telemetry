@@ -1,9 +1,6 @@
 package elasticsearch
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/rs/zerolog/log"
 )
 
@@ -71,45 +68,11 @@ func (e *Elasticsearch) Search(Index string, Query string) (*ElasticsearchResult
 	}
 
 	logger.Debug().Str("id", "DBG10020001").Str("query", Query).Str("endpoint", endpoint).Msg("Execute Query")
-	err:=e.Connection.PostJSON(endpoint, []byte(Query), ResultJson)
+	err := e.Connection.PostJSON(endpoint, []byte(Query), ResultJson)
 	if err != nil {
 		logger.Error().Str("id", "ERR10020002").Err(err).Msg("Query failed")
 		return ResultJson, err
 	}
 	logger.Info().Str("id", "INF10020001").Str("query", Query).Str("endpoint", endpoint).Msg("Successfully executed query")
 	return ResultJson, nil
-}
-
-// Retrieve an element from a HitResult, which may be a nested structure.
-// Needle is the name of the element to retrieve. For nested fields, the dot
-// notation can be used, e.g. "log.level" fetches the contents of "level" from
-// the "log" element.
-func (haystack HitElement) Get(Needle string) (interface{}, bool) {
-	if len(haystack) == 0 {
-		return "", false
-	}
-	n := strings.Split(Needle, ".")
-	key := n[0]
-	if len(n) > 1 {
-		subkeys := strings.Join(n[1:], ".")
-		subvalues, ok := haystack[n[0]].(HitElement)
-		if !ok {
-			return "", ok
-		}
-		return subvalues.Get(subkeys)
-	}
-	value, ok := haystack[key]
-	if !ok {
-		return "", ok
-	}
-	return value, true
-}
-
-// Retrieve a String from a HitResult, which may be a nested structure.
-// Needle is the name of the element to retrieve. For nested fields, the dot
-// notation can be used, e.g. "log.level" fetches the contents of "level" from
-// the "log" element.
-func (haystack HitElement) GetString(Needle string) (string, bool) {
-	s, ok := haystack.Get(Needle)
-	return fmt.Sprintf("%v", s), ok
 }

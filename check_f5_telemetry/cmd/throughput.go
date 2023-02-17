@@ -57,7 +57,7 @@ var throughputCmd = &cobra.Command{
 			return
 		}
 
-		t, err = throughput.NewThroughput(viper.GetString("index"), viper.GetString("filename"), elasticsearch, nagios)
+		t, err = throughput.NewThroughput(viper.GetString("index"), elasticsearch, nagios)
 		if err != nil {
 			nagios.AddResult(nagiosplugin.UNKNOWN, "Could not create throughput check")
 			log.Fatal().Err(err).Msg("Could not create throughput check")

@@ -8,7 +8,7 @@ import (
 
 	"regexp"
 
-	"github.com/davecgh/go-spew/spew"
+	//"github.com/davecgh/go-spew/spew"
 	"github.com/joernott/monitoring-check_f5_telemetry/check_f5_telemetry/elasticsearch"
 	"github.com/joernott/nagiosplugin/v2"
 
@@ -107,15 +107,14 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 	} else {
 		fields = e.Hits.Hits[0].Fields
 	}
-	
-	if len (fields) == 0 {
+
+	if len(fields) == 0 {
 		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No data for pool %v. ", p.pool))
 		logger.Error().Str("id", "ERR10020001").
 			Msg("No data for pool")
-		spew.Dump(e)
-		return nil, errors.New("No data for pool "+ p.pool)
+		return nil, errors.New("No data for pool " + p.pool)
 	}
-	
+
 	s = new(PoolState)
 	fieldname := "pools." + p.pool + ".availabilityState.keyword"
 	s.AvailabilityState = fmt.Sprintf("%v", fields[fieldname].([]interface{})[0])
