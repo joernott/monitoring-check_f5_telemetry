@@ -147,7 +147,7 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 	if s.PacketsOut,err = p.getField(fields,"serverside.pktsOut"); err != nil {
 		return nil, err
 	}
-	if s.BitsIn,err = p.p.getField(fields,"serverside.bitsIn"); err != nil {
+	if s.BitsIn,err = p.getField(fields,"serverside.bitsIn"); err != nil {
 		return nil, err
 	}
 	if s.BitsOut,err = p.getField(fields,"serverside.bitsOut"); err != nil {

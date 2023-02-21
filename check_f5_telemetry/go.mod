@@ -3,7 +3,6 @@ module github.com/joernott/monitoring-check_f5_telemetry/check_f5_telemetry
 go 1.18
 
 require (
-	github.com/davecgh/go-spew v1.1.1
 	github.com/joernott/lra v1.0.0-beta2
 	github.com/joernott/nagiosplugin/v2 v2.0.3
 	github.com/rs/zerolog v1.29.0
