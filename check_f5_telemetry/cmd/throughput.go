@@ -28,6 +28,8 @@ var throughputCmd = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		var t *throughput.Throughput
+		logger := log.With().Str("func", "throughput.Run").Str("package", "cmd").Logger()
+		logger.Trace().Msg("Enter func")
 
 		nagios := nagiosplugin.NewCheck()
 		nagios.SetVerbosity(nagiosplugin.VERBOSITY_MULTI_LINE)
@@ -35,6 +37,7 @@ var throughputCmd = &cobra.Command{
 
 		parsedTimeout, err := parseTimeout(viper.GetString("timeout"))
 		if err != nil {
+			logger.Error().Str("id","00020001").Err(err).Msg("Could not parse timeout")
 			nagios.AddResult(nagiosplugin.UNKNOWN, "Could not parse timeout")
 			return
 		}
