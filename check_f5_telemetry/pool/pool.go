@@ -81,7 +81,7 @@ func (p *Pool) Execute() (*PoolState, error) {
 		if data != nil {
 			reason = data.Error.Reason
 		}
-		logger.Error().Str("id", "ERR10010001").
+		logger.Error().Str("id", "ERR10020001").
 			Str("parsed_query", q).
 			Str("reason", reason).
 			Err(err).
@@ -110,20 +110,23 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 
 	if len(fields) == 0 {
 		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No data for pool %v. ", p.pool))
-		logger.Error().Str("id", "ERR10020001").
-			Msg("No data for pool")
+		logger.Error().Str("id", "ERR10030001").Msg("No data for pool")
 		return nil, errors.New("No data for pool " + p.pool)
 	}
-
 	s = new(PoolState)
 	fieldname := "pools." + p.pool + ".availabilityState.keyword"
+	if fields[fieldname] == nil {
+		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No availabilityState for pool %v. Does this pool exist?", p.pool))
+		logger.Error().Str("id", "ERR10030002").Str("field",fieldname).Msg("No availabilityState for pool")
+		return nil, errors.New("No availabilityState for pool " + p.pool)
+	}
 	s.AvailabilityState = fmt.Sprintf("%v", fields[fieldname].([]interface{})[0])
 	f := "2006-01-02T15:04:05.000Z"
 	t := fmt.Sprintf("%v", fields["@timestamp"].([]interface{})[0])
 	ts, err := time.Parse(f, t)
 	if err != nil {
 		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("Could not parse @timestamp %v. ", t))
-		logger.Error().Str("id", "ERR10020002").
+		logger.Error().Str("id", "ERR10030003").
 			Str("field", "@timestamp").
 			Str("value", t).
 			Str("format", f).
@@ -132,19 +135,35 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 		return nil, err
 	}
 	s.Timestamp = ts
-	s.CurrentConnections = fields["pools."+p.pool+".serverside.curConns"].([]interface{})[0].(float64)
-	s.MaxConnections = fields["pools."+p.pool+".serverside.maxConns"].([]interface{})[0].(float64)
-	s.PacketsIn = fields["pools."+p.pool+".serverside.pktsIn"].([]interface{})[0].(float64)
-	s.PacketsOut = fields["pools."+p.pool+".serverside.pktsOut"].([]interface{})[0].(float64)
-	s.BitsIn = fields["pools."+p.pool+".serverside.bitsIn"].([]interface{})[0].(float64)
-	s.BitsOut = fields["pools."+p.pool+".serverside.bitsOut"].([]interface{})[0].(float64)
-	s.ActiveMemberCount = uint(fields["pools."+p.pool+".activeMemberCnt"].([]interface{})[0].(float64))
+	if s.CurrentConnections,err = p.getField(fields,"serverside.curConns"); err != nil {
+		return nil, err
+	}
+	if s.MaxConnections,err = p.getField(fields,"serverside.maxConns"); err != nil {
+		return nil, err
+	}
+	if s.PacketsIn,err = p.getField(fields,"serverside.pktsIn"); err != nil {
+		return nil, err
+	}
+	if s.PacketsOut,err = p.getField(fields,"serverside.pktsOut"); err != nil {
+		return nil, err
+	}
+	if s.BitsIn,err = p.p.getField(fields,"serverside.bitsIn"); err != nil {
+		return nil, err
+	}
+	if s.BitsOut,err = p.getField(fields,"serverside.bitsOut"); err != nil {
+		return nil, err
+	}
+	amc, err:=p.getField(fields,"activeMemberCnt")
+	if err != nil {
+		return nil, err
+	}
+	s.ActiveMemberCount = uint(amc)
 	s.Members = make(PoolMemberState)
 	for f, _ := range fields {
 		r := "pools\\." + p.pool + ".members\\..*\\.enabledState.keyword"
 		match, err := regexp.MatchString(r, f)
 		if err != nil {
-			logger.Error().Str("id", "ERR10020002").
+			logger.Error().Str("id", "ERR10030004").
 				Str("field", f).
 				Str("regex", r).
 				Err(err).
@@ -173,7 +192,7 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 			}
 			m := PoolMemberData{a, e}
 			s.TotalMembers++
-			logger.Debug().Str("id", "DBG10020001").
+			logger.Debug().Str("id", "DBG10030001").
 				Bool("match", true).
 				Str("field", f).
 				Str("regex", r).
@@ -183,7 +202,7 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 				Msg("Match found")
 			s.Members[member] = m
 		} else {
-			logger.Trace().Str("id", "DBG10020002").
+			logger.Trace().Str("id", "DBG10030002").
 				Bool("match", false).
 				Str("field", f).
 				Str("regex", r).
@@ -191,6 +210,17 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 		}
 	}
 	return s, nil
+}
+
+func (p *Pool)getField(fields elasticsearch.HitElement, fieldname string)(float64,error) {
+	logger := log.With().Str("func", "gatherPoolState").Str("package", "pool").Str("pool", p.pool).Logger()
+	logger.Trace().Msg("Enter func")
+	if fields[fieldname] == nil {
+		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No field %v for pool %v. Does this pool exist?", fieldname, p.pool))
+		logger.Error().Str("id", "ERR10040002").Str("field",fieldname).Msg("No availabilityState for pool")
+		return 0, errors.New(fmt.Sprintf("No field %v for pool %v. Does this pool exist?", fieldname, p.pool))
+	}
+	return fields["pools."+p.pool+"."+fieldname].([]interface{})[0].(float64), nil
 }
 
 func (p *Pool) Check(s *PoolState, Warn string, Crit string, AgeWarn string, AgeCrit string) {
@@ -221,7 +251,7 @@ func checkRange(nagios *nagiosplugin.Check, CheckRange string, Value uint, Alert
 	}
 	r, err := nagiosplugin.ParseRange(CheckRange)
 	if err != nil {
-		logger.Error().Str("id", "ERR10040001").
+		logger.Error().Str("id", "ERR10060001").
 			Str("field", AlertType).
 			Str("range", CheckRange).
 			Err(err).
