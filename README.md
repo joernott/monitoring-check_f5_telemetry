@@ -481,7 +481,7 @@ Elasticsearch needs a few things in place before we can actually store data in i
     apply Service "f5_elasticsearch-pool" {
       import "st_f5_telemetry_pool"
 
-      command_endpoint = host.vars.f5_check_from
+      command_endpoint = host.vars.cf5_check_from
       vars.cf5_warning = 0
       vars.cf5_critical = 1
       vars.cf5_pool = "/Common/elasticsearch-pool"
@@ -491,9 +491,9 @@ Elasticsearch needs a few things in place before we can actually store data in i
     apply Service "f5_throughput" {
       import "st_f5_throughput"
 
-      command_endpoint = host.vars.f5_check_from
-      vars.f5_throughput_warn = "$host.vars.f5_throughput_warn$"
-      vars.f5_throughput_crit = "$host.vars.f5_throughput_crit$"
+      command_endpoint = host.vars.cf5_check_from
+      vars.cf5_throughput_warn = "$host.vars.cf5_throughput_warn$"
+      vars.cf5_throughput_crit = "$host.vars.cf5_throughput_crit$"
       assign where "f5" in host.vars.applications
     }
 
@@ -521,9 +521,7 @@ Elasticsearch needs a few things in place before we can actually store data in i
       address = "10.0.0.1"
       groups = [ "production", "f5", ]
       vars.applications = [ "f5", "f5_elasticsearch" ]
-      vars.f5_check_from = "management.example.com"
-      vars.f5_throughput_crit = 25690112
-      vars.f5_throughput_warn = 23592960
+      vars.cf5_check_from = "management.example.com"
       vars.cf5_throughput_critical = 25690112
       vars.cf5_throughput_warning = 23592960
       vars.cf5_user = "monitor_f5_telemetry"
