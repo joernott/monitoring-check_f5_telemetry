@@ -215,12 +215,13 @@ func (p *Pool) gatherPoolState(e *elasticsearch.ElasticsearchResult) (*PoolState
 func (p *Pool)getField(fields elasticsearch.HitElement, fieldname string)(float64,error) {
 	logger := log.With().Str("func", "gatherPoolState").Str("package", "pool").Str("pool", p.pool).Logger()
 	logger.Trace().Msg("Enter func")
-	if fields[fieldname] == nil {
-		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No field %v for pool %v. Does this pool exist?", fieldname, p.pool))
-		logger.Error().Str("id", "ERR10040002").Str("field",fieldname).Msg("No availabilityState for pool")
-		return 0, errors.New(fmt.Sprintf("No field %v for pool %v. Does this pool exist?", fieldname, p.pool))
+        f := "pools." + p.pool + "." + fieldname
+	if fields[f] == nil {
+		p.nagios.AddResult(nagiosplugin.UNKNOWN, fmt.Sprintf("No field %v for pool %v. Does this pool exist?", f, p.pool))
+		logger.Error().Str("id", "ERR10040002").Str("field",f).Msg("No availabilityState for pool")
+		return 0, errors.New(fmt.Sprintf("No field %v for pool %v. Does this pool exist?", f, p.pool))
 	}
-	return fields["pools."+p.pool+"."+fieldname].([]interface{})[0].(float64), nil
+	return fields[f].([]interface{})[0].(float64), nil
 }
 
 func (p *Pool) Check(s *PoolState, Warn string, Crit string, AgeWarn string, AgeCrit string) {
