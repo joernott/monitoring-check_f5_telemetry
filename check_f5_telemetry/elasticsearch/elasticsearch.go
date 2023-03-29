@@ -2,6 +2,7 @@
 package elasticsearch
 
 import (
+	"net/url"
 	"time"
 
 	"github.com/joernott/lra"
@@ -72,7 +73,7 @@ func NewElasticsearch(SSL bool, Host string, Port int, User string, Password str
 		Port,
 		"",
 		User,
-		Password,
+		url.QueryEscape(Password),
 		ValidateSSL,
 		Proxy,
 		Socks,
