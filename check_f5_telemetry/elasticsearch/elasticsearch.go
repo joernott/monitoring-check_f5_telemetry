@@ -44,7 +44,7 @@ type ElasticsearchErrorResource struct {
 	Id   string `json:"id"`
 }
 
-//Create a new elasticsearch connection. SSL, Host, Port, User and Password
+// Create a new elasticsearch connection. SSL, Host, Port, User and Password
 // specify where and how to connect to and how to authenticate. If ValidateSSL
 // is false, the certificate of the elasticsearch server won't be checked.
 // Optionally, a proxy URL can be specified. Setting Socks expects the proxy to
